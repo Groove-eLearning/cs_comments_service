@@ -11,6 +11,49 @@ post "#{APIPREFIX}/users" do
   end
 end
 
+get "#{APIPREFIX}/users/:course_id/stats2" do |course_id|
+  page = (params["page"] || DEFAULT_PAGE).to_i
+  page = [1, page].max
+  per_page = (params["per_page"] || DEFAULT_PER_PAGE).to_i
+  per_page = DEFAULT_PER_PAGE if per_page <= 0
+
+  # There are two sorts available, activity t sor
+  sort_by = params["sort_key"] || "activity"
+  puts sort_by
+  if sort_by == "flagged"
+    sort_criterion = [
+      ["course_stats.active_flags", :desc],
+      ["course_stats.inactive_flags", :desc],
+    ]
+  else
+    sort_criterion = [
+      ["course_stats.threads", :desc],
+      ["course_stats.responses", :desc],
+      ["course_stats.replies", :desc],
+    ]
+  end
+
+  paginated_stats = User
+                      .where("course_stats.course_id" => course_id)
+                      .only(:username, :course_stats)
+                      .order_by(sort_criterion)
+                      .paginate(:page => page, :per_page => per_page)
+  total_count = paginated_stats.total_entries
+
+  data = paginated_stats.to_a.map { |user_stats| {
+    "username" => user_stats["username"]
+  }.merge(
+    user_stats["course_stats"].first.except("_id", "course_id")
+  ) }
+
+  {
+    user_stats: data,
+    num_pages: [1, (total_count / per_page.to_f).ceil].max,
+    page: page,
+    count: total_count,
+  }.to_json
+end
+
 get "#{APIPREFIX}/users/:course_id/stats" do |course_id|
   user_data = {}
   data = Content.collection.aggregate(

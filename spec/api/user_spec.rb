@@ -399,7 +399,6 @@ describe "app" do
         course_id = Faker::Lorem.word
         authors = %w[author-1 author-2 author-3].map { |id| create_test_user(id) }
         expected_result = Hash[authors.map { |author| [author.external_id, {
-          "author_id" => author.external_id,
           "username" => author.username,
           "active_flags" => 0,
           "inactive_flags" => 0,
@@ -428,11 +427,13 @@ describe "app" do
             end
           end
         end
+        # Sort the map entries using the default sort
+        expected_result = expected_result.values.sort_by  { |val| [val["threads"], val["responses"], val["replies"]] }.reverse
 
-        get "/api/v1/users/#{course_id}/stats"
+        get "/api/v1/users/#{course_id}/stats2"
         expect(last_response.status).to eq(200)
         res = parse(last_response.body)
-        expect(res).to eq expected_result
+        expect(res["user_stats"]).to eq expected_result
       end
     end
 
