@@ -18,13 +18,15 @@ get "#{APIPREFIX}/users/:course_id/stats2" do |course_id|
   per_page = DEFAULT_PER_PAGE if per_page <= 0
 
   # There are two sorts available, activity t sor
-  sort_by = params["sort_key"] || "activity"
+  sort_by = params["sort_key"]
   if sort_by == "flagged"
+    # If sorting by flags we sort by active flags and then inactive flags
     sort_criterion = [
       ["course_stats.active_flags", :desc],
       ["course_stats.inactive_flags", :desc],
     ]
   else
+    # If sorting by activity (default) sort by thread count, then responses, then replies.
     sort_criterion = [
       ["course_stats.threads", :desc],
       ["course_stats.responses", :desc],
@@ -34,13 +36,13 @@ get "#{APIPREFIX}/users/:course_id/stats2" do |course_id|
 
   paginated_stats = User
                       .where("course_stats.course_id" => course_id)
-                      .only(:username, :course_stats)
+                      .only(:username, :'course_stats.$')
                       .order_by(sort_criterion)
                       .paginate(:page => page, :per_page => per_page)
   total_count = paginated_stats.total_entries
 
   data = paginated_stats.to_a.map { |user_stats| {
-    "username" => user_stats["username"]
+    :username => user_stats["username"]
   }.merge(
     user_stats["course_stats"].first.except("_id", "course_id")
   ) }

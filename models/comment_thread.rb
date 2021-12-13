@@ -77,7 +77,7 @@ class CommentThread < Content
   before_create :set_last_activity_at
   after_update :clear_endorsements
   before_destroy :destroy_subscriptions
-  before_destroy do
+  after_destroy do
     unless anonymous or anonymous_to_peers
       author.update_stats_for_course(course_id, threads: -1)
     end

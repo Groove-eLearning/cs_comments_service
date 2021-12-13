@@ -385,6 +385,9 @@ describe "app" do
       include_examples "unicode data"
     end
     describe "GET /api/v1/users/:course_id/stats" do
+
+      let(:course_id) { Faker::Lorem.word }
+
       def add_flags(content, expected_result)
         # Add a random number of abuse flaggers (0 to 2) and historical abuse flaggers
         content.abuse_flaggers = (1..Random.rand(3)).to_a
@@ -395,10 +398,9 @@ describe "app" do
         expected_result[content.author.external_id]["inactive_flags"] += (content.historical_abuse_flaggers.length > 0) ? 1 : 0
       end
 
-      it "returns user's stats" do
-        course_id = Faker::Lorem.word
+      def build_structure_and_response
         authors = %w[author-1 author-2 author-3].map { |id| create_test_user(id) }
-        expected_result = Hash[authors.map { |author| [author.external_id, {
+        expected_data = Hash[authors.map { |author| [author.external_id, {
           "username" => author.username,
           "active_flags" => 0,
           "inactive_flags" => 0,
@@ -409,31 +411,149 @@ describe "app" do
         # Create 10 random threads with random authors
         (0..10).each do
           thread_author = authors.sample
-          expected_result[thread_author.external_id]["threads"] += 1
+          expected_data[thread_author.external_id]["threads"] += 1
           thread = make_thread(thread_author, Faker::Lorem.sentence, course_id, Faker::Lorem.word)
-          add_flags(thread, expected_result)
+          add_flags(thread, expected_data)
           # For each thread create 5 random comments with random authors
           (0..5).each do
             comment_author = authors.sample
-            expected_result[comment_author.external_id]["responses"] += 1
+            expected_data[comment_author.external_id]["responses"] += 1
             comment = make_comment(comment_author, thread, Faker::Lorem.sentence)
-            add_flags(comment, expected_result)
+            add_flags(comment, expected_data)
             # For each comment create 3 random replies with random authors
             (0..2).each do
               reply_author = authors.sample
-              expected_result[reply_author.external_id]["replies"] += 1
+              expected_data[reply_author.external_id]["replies"] += 1
               reply = make_comment(reply_author, comment, Faker::Lorem.sentence)
-              add_flags(reply, expected_result)
+              add_flags(reply, expected_data)
             end
           end
         end
+        expected_data
+      end
+
+
+      it "returns user's stats with default/activity sort" do
+        expected_data = build_structure_and_response
         # Sort the map entries using the default sort
-        expected_result = expected_result.values.sort_by  { |val| [val["threads"], val["responses"], val["replies"]] }.reverse
+        expected_result = expected_data.values.sort_by  { |val| [val["threads"], val["responses"], val["replies"]] }.reverse
 
         get "/api/v1/users/#{course_id}/stats2"
         expect(last_response.status).to eq(200)
         res = parse(last_response.body)
         expect(res["user_stats"]).to eq expected_result
+      end
+
+      it "returns user's stats with flagged sort" do
+        expected_data = build_structure_and_response
+        # Sort the map entries using the default sort
+        expected_result = expected_data.values.sort_by  { |val| [val["active_flags"], val["inactive_flags"]] }.reverse
+
+        get "/api/v1/users/#{course_id}/stats2", sort_key: "flagged"
+        expect(last_response.status).to eq(200)
+        res = parse(last_response.body)
+        expect(res["user_stats"]).to eq expected_result
+      end
+
+      it "handles deleting threads" do
+        expected_data = build_structure_and_response
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        # Save stats for first entry
+        original_stats = res["user_stats"][0]
+        CommentThread.where(:author_username => original_stats["username"], :course_id => course_id).first.destroy
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        new_stats = res["user_stats"].detect { |stats| stats["username"] == original_stats["username"] }
+        # Thread count should have gone down by 1
+        expect(new_stats["threads"]).to eq original_stats["threads"] - 1
+        # Replies and responses should have gone down, or stayed the same since all comments and responses in a
+        # thread will be deleted.
+        expect(new_stats["responses"]).to be <= original_stats["responses"]
+        expect(new_stats["replies"]).to be <= original_stats["replies"]
+      end
+
+      it "handles deleting responses" do
+        expected_data = build_structure_and_response
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        # Save stats for first entry
+        original_stats = res["user_stats"][0]
+        Comment.where(:author_username => original_stats["username"], :course_id => course_id, :parent_id => nil).first.destroy
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        new_stats = res["user_stats"].detect { |stats| stats["username"] == original_stats["username"] }
+        # Thread count should stay the same
+        expect(new_stats["threads"]).to eq original_stats["threads"]
+
+        expect(new_stats["responses"]).to eq original_stats["responses"] - 1
+        expect(new_stats["replies"]).to be <= original_stats["replies"]
+      end
+
+      it "handles deleting replies" do
+        expected_data = build_structure_and_response
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        # Save stats for first entry
+        original_stats = res["user_stats"][0]
+        Comment.where(:author_username => original_stats["username"], :course_id => course_id, :parent_id.ne => nil).first.destroy
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        new_stats = res["user_stats"].detect { |stats| stats["username"] == original_stats["username"] }
+        # Thread count should stay the same
+        expect(new_stats["threads"]).to eq original_stats["threads"]
+        expect(new_stats["responses"]).to eq original_stats["responses"]
+        expect(new_stats["replies"]).to eq original_stats["replies"] -1
+        end
+
+      it "handles abuse flags" do
+        expected_data = build_structure_and_response
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        # Save stats for first entry
+        original_stats = res["user_stats"][0]
+        # Find a comment with no flags
+        comment = Comment.where(:author_username => original_stats["username"], :course_id => course_id, :abuse_flaggers => []).first
+        # Add a flag
+        put "/api/v1/comments/#{comment.id}/abuse_flag", user_id: 1
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        new_stats = res["user_stats"].detect { |stats| stats["username"] == original_stats["username"] }
+        # The active flags should go up.
+        expect(new_stats["active_flags"]).to eq original_stats["active_flags"] + 1
+        # All other counts should remain the same
+        expect(new_stats["threads"]).to eq original_stats["threads"]
+        expect(new_stats["responses"]).to eq original_stats["responses"]
+        expect(new_stats["replies"]).to eq original_stats["replies"]
+        expect(new_stats["inactive_flags"]).to eq original_stats["inactive_flags"]
+        end
+
+      it "handles removing flags" do
+        expected_data = build_structure_and_response
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        # Save stats for first entry
+        original_stats = res["user_stats"][0]
+
+        # Find a comment by this user and set its abuse flaggers to two users.
+        comment = Comment.where(:author_username => original_stats["username"], :course_id => course_id, :abuse_flaggers.ne => []).first
+        comment.abuse_flaggers = ["1", "2"]
+        comment.save
+
+        # Remove the flag by that user
+        put "/api/v1/comments/#{comment.id}/abuse_unflag", user_id: 1
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        new_stats = res["user_stats"].detect { |stats| stats["username"] == original_stats["username"] }
+        # The active flags should stay the same right now, since there is still a flagger left.
+        expect(new_stats["active_flags"]).to eq original_stats["active_flags"]
+
+        put "/api/v1/comments/#{comment.id}/abuse_unflag", user_id: 2
+        get "/api/v1/users/#{course_id}/stats2"
+        res = parse(last_response.body)
+        new_stats = res["user_stats"].detect { |stats| stats["username"] == original_stats["username"] }
+        # The active flags should reduce by one, since there are no more flags left.
+        expect(new_stats["active_flags"]).to eq original_stats["active_flags"] - 1
       end
     end
 

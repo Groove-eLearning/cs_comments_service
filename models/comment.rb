@@ -66,7 +66,7 @@ class Comment < Content
   before_destroy :destroy_children
   before_create :set_thread_last_activity_at
   before_save :set_sk
-  before_destroy do
+  after_destroy do
     unless anonymous or anonymous_to_peers
       if parent_id.nil?
         author.update_stats_for_course(course_id, responses: -1)
