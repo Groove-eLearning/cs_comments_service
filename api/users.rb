@@ -19,7 +19,6 @@ get "#{APIPREFIX}/users/:course_id/stats2" do |course_id|
 
   # There are two sorts available, activity t sor
   sort_by = params["sort_key"] || "activity"
-  puts sort_by
   if sort_by == "flagged"
     sort_criterion = [
       ["course_stats.active_flags", :desc],
