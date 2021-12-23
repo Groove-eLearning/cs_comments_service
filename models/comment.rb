@@ -75,7 +75,7 @@ class Comment < Content
       end
     end
   end
-  after_save do
+  after_create do
     # Don't count anonymous posts
     unless anonymous or anonymous_to_peers
       if parent_id.nil?
@@ -209,7 +209,7 @@ end
 def build_course_stats_for_user(user, course_id)
   data = Content.collection.aggregate(
     [
-      # Match all content in the course
+      # Match all content in the course by the specified author
       { "$match" => { :course_id => course_id, :author_id => user.external_id } },
       # Keep a count of flags for each entry
       {
@@ -222,7 +222,7 @@ def build_course_stats_for_user(user, course_id)
       },
       {
         "$group" => {
-          # Here we're grouping items by the type (comment or thread), and the user, and whether the comment is a reply.
+          # Here we're grouping items by the type (comment or thread), and whether the comment is a reply.
           # For threads is_reply will always be false.
           :_id => { :type => "$_type", :is_reply => "$is_reply" },
           # This will just count each group, so we get a breakdown of how many comments and threads a user has created.

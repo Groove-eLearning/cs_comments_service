@@ -240,15 +240,6 @@ class User
     read_state.save
   end
 
-  def stats_for_course(course_id)
-    begin
-      stats = course_stats.find(course_id: course_id)
-    rescue Mongoid::Errors::DocumentNotFound
-      stats = build_course_stats_for_user(self, course_id)
-    end
-    stats
-  end
-
   ##
   # Update stats for a the user for the specified course by the specified amounts.
   # The amounts here are increments/decrements, and not absolute
