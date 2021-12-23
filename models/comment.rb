@@ -104,12 +104,13 @@ class Comment < Content
       self.class.hash_tree(subtree_hash).first
     else
       as_document
-        .slice(BODY, COURSE_ID, ENDORSED, ENDORSEMENT, ANONYMOUS, ANONYMOUS_TO_PEERS, CREATED_AT, UPDATED_AT, AT_POSITION_LIST, EDIT_REASON_CODE, EDIT_HISTORY)
+        .slice(BODY, COURSE_ID, ENDORSED, ENDORSEMENT, ANONYMOUS, ANONYMOUS_TO_PEERS, CREATED_AT, UPDATED_AT, AT_POSITION_LIST, EDIT_REASON_CODE)
         .merge!("id" => _id,
                 "user_id" => author_id,
                 "username" => author_username,
                 "depth" => depth,
                 "closed" => comment_thread.nil? ? false : comment_thread.closed,
+                "edit_history" => edit_history.map(&:to_hash),
                 "thread_id" => comment_thread_id,
                 "parent_id" => parent_ids[-1],
                 "commentable_id" => comment_thread.nil? ? nil : comment_thread.commentable_id,

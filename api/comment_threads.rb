@@ -77,7 +77,12 @@ put "#{APIPREFIX}/threads/:thread_id" do |thread_id|
   end
   if updated_content.has_key? BODY and updated_content[BODY] != thread.body
     edit_reason_code = params.fetch("edit_reason_code", nil)
-    thread.edit_history.build(original_body: thread.body, author: user, reason_code: edit_reason_code)
+    thread.edit_history.build(
+      original_body: thread.body,
+      author: user,
+      reason_code: edit_reason_code,
+      editor_username: user.username,
+    )
     thread.save
   end
   thread.update_attributes(updated_content)

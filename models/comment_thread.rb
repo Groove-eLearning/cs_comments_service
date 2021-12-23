@@ -133,12 +133,13 @@ class CommentThread < Content
 
   def to_hash(params={})
     as_document
-      .slice(THREAD_TYPE, TITLE, BODY, COURSE_ID, ANONYMOUS, ANONYMOUS_TO_PEERS, COMMENTABLE_ID, CREATED_AT, UPDATED_AT, AT_POSITION_LIST, CLOSED, CONTEXT, LAST_ACTIVITY_AT, CLOSE_REASON_CODE, EDIT_REASON_CODE, EDIT_HISTORY)
+      .slice(THREAD_TYPE, TITLE, BODY, COURSE_ID, ANONYMOUS, ANONYMOUS_TO_PEERS, COMMENTABLE_ID, CREATED_AT, UPDATED_AT, AT_POSITION_LIST, CLOSED, CONTEXT, LAST_ACTIVITY_AT, CLOSE_REASON_CODE, EDIT_REASON_CODE)
       .merge!("id" => _id,
               "user_id" => author_id,
               "username" => author_username,
               "votes" => votes.slice(COUNT, UP_COUNT, DOWN_COUNT, POINT),
               "abuse_flaggers" => abuse_flaggers,
+              "edit_history" => edit_history.map(&:to_hash),
               "closed_by" => closed_by? ? closed_by.username : nil,
               "tags" => [],
               "type" => THREAD,

@@ -28,9 +28,11 @@ USERNAME = "username".freeze
 EXTERNAL_ID = "external_id".freeze
 COMMENT = "comment".freeze
 THREAD = "thread".freeze
+
+REASON_CODE = "reason_code".freeze
 CLOSE_REASON_CODE = "close_reason_code".freeze
 EDIT_REASON_CODE = "edit_reason_code".freeze
-PREVIOUS_BODY = "previous_body".freeze
+ORIGINAL_BODY = "original_body".freeze
 EDIT_HISTORY = "edit_history".freeze
 
 RETIRED_TITLE = "[deleted]".freeze
