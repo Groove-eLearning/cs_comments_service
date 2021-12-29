@@ -213,7 +213,7 @@ def build_course_stats_for_user(user, course_id)
       { "$match" => { :course_id => course_id, :author_id => user.external_id } },
       # Keep a count of flags for each entry
       {
-        "$set" => {
+        "$addFields" => {
           # Just using $ne with null will return true if the field is absent
           # So we first fall all absent fields to null, then check if it's null,
           # that way we match for the absence of the field or value = null
